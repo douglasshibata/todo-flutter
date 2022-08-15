@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:todo/models/item.dart';
 
 void main() {
   runApp(App());
@@ -15,14 +16,27 @@ class App extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: const HomePage(),
+      home: HomePage(),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
+class HomePage extends StatefulWidget {
+  var items = <Item>[];
+  HomePage() {
+    items = [];
+    items.add(Item(title: "Item 1", done: false));
+    items.add(Item(title: "Item 2", done: false));
+    items.add(Item(title: "Item 3", done: false));
+    items.add(Item(title: "Item 4", done: false));
+    items.add(Item(title: "Item 5", done: false));
+    items.add(Item(title: "Item 6", done: false));
+  }
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
 
+class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,10 +46,11 @@ class HomePage extends StatelessWidget {
           Icon(Icons.plus_one),
         ],
       ),
-      body: Container(
-        child: Center(
-          child: Text('Olá Mundo!!!!'),
-        ),
+      body: ListView.builder(
+        itemCount: widget.items.length,
+        itemBuilder: (BuildContext buildContext, int index) {
+          return Text(widget.items[index].title);
+        },
       ),
     );
   }

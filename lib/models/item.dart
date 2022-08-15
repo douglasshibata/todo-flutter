@@ -1,9 +1,9 @@
 // https://javiercbk.github.io/json_to_dart/
 class Item {
-  String? title;
+  late String title;
   bool? done;
 
-  Item({this.title, this.done});
+  Item({required this.title, this.done});
 
   Item.fromJson(Map<String, dynamic> json) {
     title = json['title'];
