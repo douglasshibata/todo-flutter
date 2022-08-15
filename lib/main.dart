@@ -38,9 +38,23 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   var newTaskController = TextEditingController();
+
+  void add() {
+    if (newTaskController.text.isEmpty) return;
+    setState(() {
+      widget.items.add(
+        Item(
+          title: newTaskController.text,
+          done: false,
+        ),
+      );
+      newTaskController.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    newTaskController.clear();
+    // newTaskController.clear();
     return Scaffold(
       appBar: AppBar(
         title: TextFormField(
@@ -73,6 +87,11 @@ class _HomePageState extends State<HomePage> {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: add,
+        child: Icon(Icons.add),
+        backgroundColor: Colors.deepOrange,
       ),
     );
   }
