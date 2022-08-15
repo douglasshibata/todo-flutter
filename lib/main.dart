@@ -25,12 +25,12 @@ class HomePage extends StatefulWidget {
   var items = <Item>[];
   HomePage() {
     items = [];
-    items.add(Item(title: "sad 1", done: false));
-    items.add(Item(title: "Item 2", done: false));
-    items.add(Item(title: "Item 3", done: false));
-    items.add(Item(title: "Item 4", done: false));
-    items.add(Item(title: "Item 5", done: false));
-    items.add(Item(title: "Item 6", done: false));
+    // items.add(Item(title: "sad 1", done: false));
+    // items.add(Item(title: "Item 2", done: false));
+    // items.add(Item(title: "Item 3", done: false));
+    // items.add(Item(title: "Item 4", done: false));
+    // items.add(Item(title: "Item 5", done: false));
+    // items.add(Item(title: "Item 6", done: false));
   }
   @override
   State<HomePage> createState() => _HomePageState();
@@ -57,6 +57,8 @@ class _HomePageState extends State<HomePage> {
       widget.items.removeAt(index);
     });
   }
+
+  Future load() async {}
 
   @override
   Widget build(BuildContext context) {
