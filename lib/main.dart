@@ -52,6 +52,7 @@ class _HomePageState extends State<HomePage> {
         ),
       );
       newTaskController.clear();
+      save();
     });
   }
 
@@ -59,6 +60,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       widget.items.removeAt(index);
     });
+    save();
   }
 
   Future load() async {
@@ -71,6 +73,11 @@ class _HomePageState extends State<HomePage> {
         widget.items = result;
       });
     }
+  }
+
+  save() async {
+    var prefs = await SharedPreferences.getInstance();
+    await prefs.setString('data', jsonEncode(widget.items));
   }
 
   _HomePageState() {
@@ -116,6 +123,7 @@ class _HomePageState extends State<HomePage> {
               onChanged: (value) {
                 setState(() {
                   item.done = value;
+                  save();
                 });
               },
             ),
