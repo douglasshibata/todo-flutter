@@ -5,9 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo/models/item.dart';
 
 void main() {
-  runApp(App());
+  runApp(const App());
 }
 
+/// Root widget for the Todo Application.
 class App extends StatelessWidget {
   const App({Key? key}) : super(key: key);
 
@@ -19,233 +20,190 @@ class App extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: HomePage(),
+      home: const HomePage(),
     );
   }
 }
 
+/// Home screen displaying the list of tasks and allowing user actions.
 class HomePage extends StatefulWidget {
-  var items = <Item>[];
-  HomePage() {
-    items = [];
-    // items.add(Item(title: "sad 1", done: false));
-    // items.add(Item(title: "Item 2", done: false));
-    // items.add(Item(title: "Item 3", done: false));
-    // items.add(Item(title: "Item 4", done: false));
-    // items.add(Item(title: "Item 5", done: false));
-    // items.add(Item(title: "Item 6", done: false));
-  }
+  const HomePage({Key? key}) : super(key: key);
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  var newTaskController = TextEditingController();
+  // Encapsulated state list of items inside the State object to avoid state mutation bugs.
+  List<Item> _items = [];
+  bool _isLoading = true;
 
-  void add() {
-    if (newTaskController.text.isEmpty) return;
-    setState(() {
-      widget.items.add(
-        Item(
-          title: newTaskController.text,
-          done: false,
-        ),
-      );
-      newTaskController.clear();
-      save();
-    });
+  // TextEditingController properly lifecycle-managed.
+  final TextEditingController _newTaskController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Asynchronously load stored items during initState lifecycle hook.
+    _loadItems();
   }
 
-  void remove(int index) {
-    setState(() {
-      widget.items.removeAt(index);
-    });
-    save();
+  @override
+  void dispose() {
+    // Dispose text controller to prevent memory leaks when widget is destroyed.
+    _newTaskController.dispose();
+    super.dispose();
   }
 
-  Future load() async {
-    var prefs = await SharedPreferences.getInstance();
-    var data = prefs.getString('data');
-    if (data != null) {
-      Iterable decoded = jsonDecode(data);
-      List<Item> result = decoded.map((e) => (Item.fromJson(e))).toList();
-      setState(() {
-        widget.items = result;
-      });
+  /// Loads saved todo items from local storage using SharedPreferences.
+  Future<void> _loadItems() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? data = prefs.getString('data');
+      if (data != null && data.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(data) as List<dynamic>;
+        final List<Item> loadedItems = decoded
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Item.fromJson(e))
+            .where((item) => item.title.isNotEmpty)
+            .toList();
+
+        if (mounted) {
+          setState(() {
+            _items = loadedItems;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      // In case of corrupt stored JSON data, fallback to empty list safely.
+      if (mounted) {
+        setState(() {
+          _items = [];
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  save() async {
-    var prefs = await SharedPreferences.getInstance();
-    await prefs.setString('data', jsonEncode(widget.items));
+  /// Persists current list of items to SharedPreferences.
+  Future<void> _saveItems() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String jsonString = jsonEncode(_items.map((e) => e.toJson()).toList());
+      await prefs.setString('data', jsonString);
+    } catch (e) {
+      // Handle potential storage errors silently or log appropriately
+      debugPrint('Error saving tasks: $e');
+    }
   }
 
-  _HomePageState() {
-    load();
+  /// Adds a new task to the item list after trimming and validating user input.
+  void _add() {
+    final String trimmedText = _newTaskController.text.trim();
+    if (trimmedText.isEmpty) return;
+
+    // Generate unique ID using timestamp and list length to prevent key collisions in Dismissible.
+    final String uniqueId = '${DateTime.now().microsecondsSinceEpoch}_${_items.length}';
+
+    setState(() {
+      _items.add(
+        Item(
+          id: uniqueId,
+          title: trimmedText,
+          done: false,
+        ),
+      );
+      _newTaskController.clear();
+    });
+    _saveItems();
+  }
+
+  /// Removes an item at [index] and persists changes.
+  void _remove(int index) {
+    if (index < 0 || index >= _items.length) return;
+    setState(() {
+      _items.removeAt(index);
+    });
+    _saveItems();
+  }
+
+  /// Toggles completion status of a task at [index].
+  void _toggleDone(int index, bool? done) {
+    if (index < 0 || index >= _items.length) return;
+    setState(() {
+      _items[index] = _items[index].copyWith(done: done ?? false);
+    });
+    _saveItems();
   }
 
   @override
   Widget build(BuildContext context) {
-    // newTaskController.clear();
     return Scaffold(
       appBar: AppBar(
         title: TextFormField(
-          controller: newTaskController,
+          controller: _newTaskController,
           keyboardType: TextInputType.text,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
           ),
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             labelText: "Nova tarefa",
             labelStyle: TextStyle(
               color: Colors.white,
             ),
           ),
+          onFieldSubmitted: (_) => _add(),
         ),
       ),
-      body: ListView.builder(
-        itemCount: widget.items.length,
-        itemBuilder: (BuildContext buildContext, int index) {
-          final item = widget.items[index];
-          return Dismissible(
-            key: Key(item.title),
-            background: Container(
-              color: Colors.red.withOpacity(0.2),
-            ),
-            onDismissed: (direction) => {
-              remove(index),
-            },
-            child: CheckboxListTile(
-              title: Text(item.title),
-              key: Key(item.title),
-              value: item.done,
-              onChanged: (value) {
-                setState(() {
-                  item.done = value;
-                  save();
-                });
-              },
-            ),
-          );
-        },
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _items.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Nenhuma tarefa cadastrada.',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _items.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final item = _items[index];
+                    return Dismissible(
+                      // Keying by unique item.id guarantees correct element identification during dismiss.
+                      key: ValueKey(item.id),
+                      background: Container(
+                        color: Colors.red.withValues(alpha: 0.2),
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.only(left: 20.0),
+                        child: const Icon(Icons.delete, color: Colors.red),
+                      ),
+                      onDismissed: (direction) {
+                        _remove(index);
+                      },
+                      child: CheckboxListTile(
+                        key: ValueKey('checkbox_${item.id}'),
+                        title: Text(item.title),
+                        value: item.done,
+                        onChanged: (value) {
+                          _toggleDone(index, value);
+                        },
+                      ),
+                    );
+                  },
+                ),
       floatingActionButton: FloatingActionButton(
-        onPressed: add,
-        child: Icon(Icons.add),
+        onPressed: _add,
         backgroundColor: Colors.deepOrange,
-      ),
-    );
-  }
-}
-/* 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
-
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.green,
-      ),
-      home: const MyHomePage(title: 'Teste'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
         child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 }
- */
